@@ -1,71 +1,32 @@
-# Practical lesson pz-SOLID  
-# Практична реалізація SOLID принципів  
+# Практична реалізація SOLID принципів у TypeScript
 
-> У цьому занятті студенти отримують практичні навички застосування SOLID принципів під час рефакторингу існуючого коду.  
-> Мета — створити гнучку, масштабовану та чисту архітектуру шляхом застосування SRP, OCP, LSP, ISP та DIP.
+## Мета
+Створити гнучку, масштабовану та чисту архітектуру шляхом аналізу "анти-SOLID" коду та його рефакторингу із застосуванням принципів SRP, OCP, LSP, ISP та DIP.
 
----
+## Аналіз вихідного коду та знайдені порушення
 
-## What need to do:
-* Провести аналіз вихідного «анти-SOLID» коду  
-* Визначити порушення кожного SOLID принципу  
-* Виконати рефакторинг згідно з:
-  * SRP — Single Responsibility Principle  
-  * OCP — Open/Closed Principle  
-  * LSP — Liskov Substitution Principle  
-  * ISP — Interface Segregation Principle  
-  * DIP — Dependency Inversion Principle  
-* Створити відповідні інтерфейси й абстракції  
-* Усунути зайві або циклічні залежності  
-* Додати мінімальний набір unit-тестів після рефакторингу  
+У файлі `src/original/badOrderProcessor.ts` було виявлено порушення усіх п'яти принципів SOLID:
 
----
+1. **SRP (Single Responsibility Principle):** Клас `BadOrderProcessor` виконував занадто багато обов'язків: валідацію замовлення, розрахунок вартості доставки, звернення до БД, виклик платіжного шлюзу та відправку email. Зміна будь-якого з цих процесів вимагала б редагування цього класу.
+2. **OCP (Open/Closed Principle):** Логіка вибору вартості доставки реалізована через блок `if-else` (hardcoded). Щоб додати нову доставку (наприклад, "міжнародна"), довелося б модифікувати метод `processOrder()`, що порушує принцип відкритості/закритості.
+3. **LSP (Liskov Substitution Principle):** Клас `DigitalOrderProcessor` наслідував базовий клас, але перевизначав метод `shipPhysicalItem()`, викидаючи помилку. Це означає, що ми не могли безболісно замінити базовий клас його нащадком без ризику краху програми.
+4. **ISP (Interface Segregation Principle):** Інтерфейс `IOrderOperations` містив методи `shipPhysicalItem` та `processPayment`. Об'єкти, яким не потрібна була фізична доставка (наприклад, цифрові товари), все одно мусили імплементувати цей метод.
+5. **DIP (Dependency Inversion Principle):** `BadOrderProcessor` напряму створював екземпляри `MySQLDatabase` та `StripeAPI` через `new`. Модуль високого рівня залежав від модулів низького рівня, замість того, щоб залежати від абстракцій.
 
-## Acceptance criteria
-* Реалізація на мові Typescript 
-* Студент розуміє кожен SOLID принцип та пояснює його застосування  
-* Увесь вихідний код проаналізовано  
-* Усі порушення SOLID знайдено та описано  
-* Після рефакторингу:
-  * Кожен клас має одну відповідальність (SRP)  
-  * Код розширюється через нові класи, а не редагування існуючих (OCP)  
-  * Класи-нащадки повністю заміщають базові (LSP)  
-  * Інтерфейси невеликі й специфічні (ISP)  
-  * Залежності реалізовані через абстракції (DIP)  
-* Код структурований, логічний та зрозумілий  
-* Усі тести проходять успішно  
-* Звіт оформлений у Markdown (README.md)
+## Опис рефакторингу
 
-## Directory Structure
-```
-├── pz-SOLID
-│   ├── src
-│   │   ├── original          # код із навмисними порушеннями SOLID
-│   │   ├── refactored        # код після рефакторингу
-│   │   ├── interfaces        # абстракції та інтерфейси
-│   ├── tests
-│   │   ├── refactored.spec.js
-│   ├── .editorconfig
-│   ├── .gitignore
-│   ├── jest.config.js
-│   ├── package.json
-│   ├── package-lock.json
-│   ├── README.md
-└──
-```
+Після рефакторингу (директорії `src/refactored` та `src/interfaces`):
 
-## Useful links
+1. **SRP:** Створено окремі класи для роботи з БД (`PostgresRepository`), оплатою (`StripePaymentProcessor`) та нотифікаціями (`EmailNotificationService`). `OrderProcessor` тепер виконує лише функцію диригента (координатора).
+2. **OCP:** Розрахунок доставки винесено в інтерфейс `IShippingCalculator`. Тепер нові типи доставки (наприклад, `FreeShipping`, `ExpressShipping`) додаються створенням нових класів, не торкаючись існуючого коду.
+3. **LSP:** Замість єдиного класу зі зламаним методом для цифрових товарів, створено абстрактний клас `BaseOrder` з абстрактним методом `processFulfillment()`. Його нащадки (`PhysicalOrder` та `DigitalOrder`) коректно реалізують свою власну логіку виконання (фізична відправка vs генерація посилання).
+4. **ISP:** Великий інтерфейс розбито на специфічні: `IPaymentProcessor`, `IOrderRepository`, `INotificationService`. Кожен клас реалізує лише те, що йому дійсно потрібно.
+5. **DIP:** Залежності передаються в `OrderProcessor` через конструктор (Dependency Injection) у вигляді інтерфейсів, а не конкретних класів. Це дозволило легко написати unit-тести, підмінивши реальні БД та платіжні шлюзи на моки (mocks).
 
-[SOLID Principles Explained](https://www.baeldung.com/solid-principles)
+## Запуск тестів
 
-[SOLID: The First 5 Principles of Object-Oriented Design](https://www.freecodecamp.org/news/solid-principles-explained-in-plain-english/)
+Для запуску тестів необхідно встановити залежності та виконати команду:
 
-[JavaScript SOLID: Реалізація принципів](https://khalilstemmler.com/articles/solid-principles/)
-
-[Clean Code Concepts Adapted for JavaScript](https://github.com/ryanmcdermott/clean-code-javascript)
-
-[Dependency Injection in JavaScript](https://javascript.plainenglish.io/dependency-injection-in-javascript-1b82a8101c1a)
-
-
-
-
+```bash
+npm install
+npx jest
